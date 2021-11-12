@@ -1,6 +1,6 @@
-# Pluto Contract
+# Planet Contract
 
-Pluto PoW Mint V0
+Planet PoW Mint V0
 
 ## Building
 
@@ -10,7 +10,7 @@ cargo build
 ## Building for WASM
 
 ```sh
-cargo wasm
+cargo run-script optimize
 ```
 
 ## Testing

@@ -3,7 +3,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct Pluto {
+pub struct Planet {
     pub epoch: u64,
     pub epoch_start_block:u64,
     pub total_mined: u64,
@@ -13,4 +13,4 @@ pub struct Pluto {
     pub tokens: u64,
 }
 
-pub const PLUTO: Item<Pluto> = Item::new("work");
+pub const PLANET: Item<Planet> = Item::new("planet");

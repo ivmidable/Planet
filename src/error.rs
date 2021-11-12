@@ -35,6 +35,12 @@ pub enum ContractError {
 
     #[error("Invalid png header")]
     InvalidPngHeader {},
+
+    #[error("Invalid fund count")]
+    InvalidFundCount {},
+
+    #[error("Invalid fund denom")]
+    InvalidFundDenom {},
 }
 
 impl From<cw20_base::ContractError> for ContractError {

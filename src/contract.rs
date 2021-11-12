@@ -2,8 +2,11 @@
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     to_binary, from_binary, Binary, Deps, DepsMut, Env, MessageInfo,
-    Response, StdResult, Uint128,
+    Response, StdResult, Uint128, Addr
 };
+
+//for tests
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use cw20_base::allowances::{
     execute_burn_from, execute_decrease_allowance, execute_increase_allowance, execute_send_from,
@@ -19,14 +22,14 @@ use cw2::set_contract_version;
 
 use crate::error::ContractError;
 
-use crate::msg::AskForPlutoResponse;
+use crate::msg::AskForPlanetResponse;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
-use crate::state::{Pluto, PLUTO};
+use crate::state::{Planet, PLANET};
 
 use sha2::Digest;
 
 // version info for migration info
-const CONTRACT_NAME: &str = "pluto";
+const CONTRACT_NAME: &str = "Planet";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -34,7 +37,7 @@ pub fn instantiate(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    _msg: InstantiateMsg,
+    msg: InstantiateMsg,
 ) -> StdResult<Response> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     let auth = deps.api.addr_validate(&info.sender.clone().into_string())?;
@@ -45,10 +48,10 @@ pub fn instantiate(
 
     // store token info using cw20-base format
     let data = TokenInfo {
-        name: "Pluto".into(),
-        symbol:"PLT".into(),
-        decimals: 9,
-        total_supply: Uint128::zero(),
+        name: msg.name,
+        symbol: msg.symbol,
+        decimals: msg.decimals,
+        total_supply: msg.total_supply,//Uint128::zero(),
         // set self as minter, so we can properly execute mint and burn
         mint: Some(MinterData {
             minter: env.contract.address.clone(),
@@ -57,11 +60,17 @@ pub fn instantiate(
     };
     TOKEN_INFO.save(deps.storage, &data)?;
 
+    //REMOVE AFTER TESTING
+    /*let now = SystemTime::now();
+    let since_the_epoch = now.duration_since(UNIX_EPOCH).unwrap();
+    let time = since_the_epoch.as_secs();*/
+
     let mut data_vec = env.contract.address.as_bytes().to_vec();
     data_vec.extend_from_slice(&env.block.time.nanos().to_le_bytes());
+    //data_vec.extend_from_slice(&time.to_le_bytes());
     data_vec.extend_from_slice(&env.block.height.to_le_bytes());
 
-    let pluto = Pluto {
+    let planet = Planet {
         epoch: 0,
         epoch_start_block: env.block.height.clone(),
         total_mined: 0,
@@ -71,7 +80,7 @@ pub fn instantiate(
         tokens: 100000000000,
     };
 
-    PLUTO.save(deps.storage, &pluto)?;
+    PLANET.save(deps.storage, &planet)?;
 
     let mint_info = MessageInfo {
         sender: env.contract.address.clone(),
@@ -142,9 +151,9 @@ pub fn execute_claim(
     info: MessageInfo,
     nonce:[u8;32]
 ) -> Result<Response, ContractError> {
-    let mut work = PLUTO.load(deps.storage)?;
+    let mut work = PLANET.load(deps.storage)?;
     
-    if check_claim(&nonce, &work.hash, &work.diff) == false {
+    if check_claim(info.sender.as_bytes(), &nonce, &work.hash, &work.diff) == false {
         return Err(ContractError::InvalidClaim {});
     }
 
@@ -166,7 +175,7 @@ pub fn execute_claim(
         work.epoch_start_block = env.block.height;
     }
 
-    PLUTO.save(deps.storage, &work)?;
+    PLANET.save(deps.storage, &work)?;
 
     let mint_info = MessageInfo {
         sender: env.contract.address.clone(),
@@ -178,6 +187,7 @@ pub fn execute_claim(
 }
 
 pub fn check_claim(
+    sender: &[u8],
     nonce: &[u8; 32],
     sha256: &[u8; 32],
     diff: &u8,
@@ -187,6 +197,7 @@ pub fn check_claim(
     magic_raw[1] = 232;
     let (magic, _rest) = magic_raw.split_at(*diff as usize);
     let mut data_vec = sha256.to_vec();
+    data_vec.extend_from_slice(sender);
     data_vec.extend_from_slice(&nonce[..]);
     let hash_vec = sha2::Sha256::digest(data_vec.as_slice()).to_vec();    
     if hash_vec.starts_with(magic) == false {
@@ -199,7 +210,7 @@ pub fn check_claim(
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     //Cw721HeroContract::default().query(deps, env, msg)
     match msg {
-        QueryMsg::Pluto {} => to_binary(&query_current_work(deps)?),
+        QueryMsg::Planet {} => to_binary(&query_current_work(deps)?),
         // inherited from cw20-base
         QueryMsg::TokenInfo {} => to_binary(&query_token_info(deps)?),
         QueryMsg::Balance { address } => to_binary(&query_balance(deps, address)?),
@@ -209,10 +220,10 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     }
 }
 
-fn query_current_work(deps: Deps) -> StdResult<AskForPlutoResponse> {
-    let pluto = PLUTO.load(deps.storage)?;
+fn query_current_work(deps: Deps) -> StdResult<AskForPlanetResponse> {
+    let planet = PLANET.load(deps.storage)?;
     //let ask = TOKEN_ASKS.load(deps.storage, (&"mint", &"mint"))?;
-    Ok(AskForPlutoResponse { pluto })
+    Ok(AskForPlanetResponse { planet })
 }
 
 #[cfg(test)]
@@ -225,6 +236,10 @@ mod tests {
 
     fn setup_contract(deps: DepsMut) {
         let msg = InstantiateMsg {
+            name: "Pluto".into(),
+            symbol: "PLT".into(),
+            decimals: 9,
+            total_supply: Uint128::zero(),
         };
         let info = mock_info(INITER, &[]);
         let res = instantiate(deps, mock_env(), info, msg).unwrap();
@@ -234,28 +249,35 @@ mod tests {
 
     fn claim(deps: DepsMut) {
         let info = mock_info(INITER, &[]);
-
-        let work = QueryMsg::Pluto {};
-        let res:AskForPlutoResponse = from_binary(&query(deps.as_ref(), mock_env(), work).unwrap()).unwrap();
+        
+        
+        let work = QueryMsg::Planet {};
+        let res:AskForPlanetResponse = from_binary(&query(deps.as_ref(), mock_env(), work).unwrap()).unwrap();
 
         //println!("{:?}", );
-        let mut hash = sha2::Sha256::digest(b"start").into();
+        let mut nonce:[u8; 32] = sha2::Sha256::digest(b"start").into();
 
+        //let mut count:u64 = 0;
         loop {
-            if check_claim(&hash, &res.pluto.hash, &res.pluto.diff) == true {
+            let mut data_vec = vec![info.sender.as_bytes()];
+            data_vec.extend_from_slice(&[&nonce[..]]);
+            if check_claim(info.sender.as_bytes(), &nonce, &res.planet.hash, &res.planet.diff) == true {
                 break;
             }
-            hash = sha2::Sha256::digest(&hash[..]).into();
+            nonce = sha2::Sha256::digest(&nonce[..]).into();
+            //count = count.checked_add(1).unwrap();
         }
 
         let claim_msg = ExecuteMsg::Claim {
-            nonce:hash
+            nonce:nonce
         };
 
 
         let _ = execute(deps, mock_env(), info, claim_msg).unwrap();
 
-        //assert_eq!(1, 2);
+        //println!("{}", count);
+
+       // assert_eq!(1, 2);
     }
 
 

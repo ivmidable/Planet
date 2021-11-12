@@ -2,11 +2,15 @@ use cosmwasm_std::{Binary, Uint128};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::state::{Pluto};
+use crate::state::{Planet};
 use cw20::Expiration;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InstantiateMsg {
+    pub name: String,
+    pub symbol: String,
+    pub decimals: u8,
+    pub total_supply: Uint128
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -65,7 +69,7 @@ pub enum ExecuteMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
-    Pluto {},
+    Planet {},
     /// Implements CW20. Returns the current balance of the given address, 0 if unset.
     Balance { address: String },
     /// Implements CW20. Returns metadata on the contract - name, decimals, supply, etc.
@@ -76,8 +80,8 @@ pub enum QueryMsg {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct AskForPlutoResponse {
-    pub pluto: Pluto,
+pub struct AskForPlanetResponse {
+    pub planet: Planet,
 }
 
 
